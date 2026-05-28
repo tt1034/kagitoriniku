@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title></title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/leaflet-heat.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="data/gis_osm_pois_a_free_1_0.js"></script>
+        <script src="data/gis_osm_buildings_a_free_1_1.js"></script>
+        <script src="data/gis_osm_railways_free_1_2.js"></script>
+        <script src="data/gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3.js"></script>
+        <script src="data/gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4.js"></script>
+        <script src="data/gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5.js"></script>
+        <script src="data/output_point_layercopy_6.js"></script>
+        <script src="data/output_point_layer_7.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[23.44646740748836,120.38533636690899],[23.51192740209632,120.5135832709626]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        function pop_gis_osm_pois_a_free_1_0(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_id'] !== null ? autolinker.link(String(feature.properties['osm_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['code'] !== null ? autolinker.link(String(feature.properties['code']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass'] !== null ? autolinker.link(String(feature.properties['fclass']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_gis_osm_pois_a_free_1_0_0() {
+            return {
+                pane: 'pane_gis_osm_pois_a_free_1_0',
+                stroke: false, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(221,207,199,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_gis_osm_pois_a_free_1_0');
+        map.getPane('pane_gis_osm_pois_a_free_1_0').style.zIndex = 400;
+        map.getPane('pane_gis_osm_pois_a_free_1_0').style['mix-blend-mode'] = 'normal';
+        var layer_gis_osm_pois_a_free_1_0 = new L.geoJson(json_gis_osm_pois_a_free_1_0, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_gis_osm_pois_a_free_1_0',
+            layerName: 'layer_gis_osm_pois_a_free_1_0',
+            pane: 'pane_gis_osm_pois_a_free_1_0',
+            onEachFeature: pop_gis_osm_pois_a_free_1_0,
+            style: style_gis_osm_pois_a_free_1_0_0,
+        });
+        bounds_group.addLayer(layer_gis_osm_pois_a_free_1_0);
+        map.addLayer(layer_gis_osm_pois_a_free_1_0);
+        function pop_gis_osm_buildings_a_free_1_1(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_id'] !== null ? autolinker.link(String(feature.properties['osm_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['code'] !== null ? autolinker.link(String(feature.properties['code']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass'] !== null ? autolinker.link(String(feature.properties['fclass']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['type'] !== null ? autolinker.link(String(feature.properties['type']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_gis_osm_buildings_a_free_1_1_0() {
+            return {
+                pane: 'pane_gis_osm_buildings_a_free_1_1',
+                stroke: false, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(207,158,130,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_gis_osm_buildings_a_free_1_1');
+        map.getPane('pane_gis_osm_buildings_a_free_1_1').style.zIndex = 401;
+        map.getPane('pane_gis_osm_buildings_a_free_1_1').style['mix-blend-mode'] = 'normal';
+        var layer_gis_osm_buildings_a_free_1_1 = new L.geoJson(json_gis_osm_buildings_a_free_1_1, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_gis_osm_buildings_a_free_1_1',
+            layerName: 'layer_gis_osm_buildings_a_free_1_1',
+            pane: 'pane_gis_osm_buildings_a_free_1_1',
+            onEachFeature: pop_gis_osm_buildings_a_free_1_1,
+            style: style_gis_osm_buildings_a_free_1_1_0,
+        });
+        bounds_group.addLayer(layer_gis_osm_buildings_a_free_1_1);
+        map.addLayer(layer_gis_osm_buildings_a_free_1_1);
+        function pop_gis_osm_railways_free_1_2(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_id'] !== null ? autolinker.link(String(feature.properties['osm_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['code'] !== null ? autolinker.link(String(feature.properties['code']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass'] !== null ? autolinker.link(String(feature.properties['fclass']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['layer'] !== null ? autolinker.link(String(feature.properties['layer']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['bridge'] !== null ? autolinker.link(String(feature.properties['bridge']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tunnel'] !== null ? autolinker.link(String(feature.properties['tunnel']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_gis_osm_railways_free_1_2_0() {
+            return {
+                pane: 'pane_gis_osm_railways_free_1_2',
+                opacity: 1,
+                color: 'rgba(163,63,47,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_gis_osm_railways_free_1_2');
+        map.getPane('pane_gis_osm_railways_free_1_2').style.zIndex = 402;
+        map.getPane('pane_gis_osm_railways_free_1_2').style['mix-blend-mode'] = 'normal';
+        var layer_gis_osm_railways_free_1_2 = new L.geoJson(json_gis_osm_railways_free_1_2, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_gis_osm_railways_free_1_2',
+            layerName: 'layer_gis_osm_railways_free_1_2',
+            pane: 'pane_gis_osm_railways_free_1_2',
+            onEachFeature: pop_gis_osm_railways_free_1_2,
+            style: style_gis_osm_railways_free_1_2_0,
+        });
+        bounds_group.addLayer(layer_gis_osm_railways_free_1_2);
+        map.addLayer(layer_gis_osm_railways_free_1_2);
+        function pop_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_id'] !== null ? autolinker.link(String(feature.properties['osm_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['code'] !== null ? autolinker.link(String(feature.properties['code']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass'] !== null ? autolinker.link(String(feature.properties['fclass']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ref'] !== null ? autolinker.link(String(feature.properties['ref']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['oneway'] !== null ? autolinker.link(String(feature.properties['oneway']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['maxspeed'] !== null ? autolinker.link(String(feature.properties['maxspeed']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['layer'] !== null ? autolinker.link(String(feature.properties['layer']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['bridge'] !== null ? autolinker.link(String(feature.properties['bridge']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tunnel'] !== null ? autolinker.link(String(feature.properties['tunnel']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3_0() {
+            return {
+                pane: 'pane_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3',
+                opacity: 1,
+                color: 'rgba(219,162,40,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3');
+        map.getPane('pane_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3').style.zIndex = 403;
+        map.getPane('pane_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3').style['mix-blend-mode'] = 'normal';
+        var layer_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3 = new L.geoJson(json_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3',
+            layerName: 'layer_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3',
+            pane: 'pane_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3',
+            onEachFeature: pop_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3,
+            style: style_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3_0,
+        });
+        bounds_group.addLayer(layer_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3);
+        map.addLayer(layer_gis_osm_roads_free_1_21af3824_e57b_4f76_8594_bc98c10d75ed_3);
+        function pop_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_id'] !== null ? autolinker.link(String(feature.properties['osm_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['code'] !== null ? autolinker.link(String(feature.properties['code']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass'] !== null ? autolinker.link(String(feature.properties['fclass']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4_0() {
+            return {
+                pane: 'pane_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4',
+                stroke: false, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(234,234,234,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4');
+        map.getPane('pane_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4').style.zIndex = 404;
+        map.getPane('pane_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4').style['mix-blend-mode'] = 'normal';
+        var layer_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4 = new L.geoJson(json_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4',
+            layerName: 'layer_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4',
+            pane: 'pane_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4',
+            onEachFeature: pop_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4,
+            style: style_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4_0,
+        });
+        bounds_group.addLayer(layer_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4);
+        map.addLayer(layer_gis_osm_water_a_free_1_8363c460_2c68_4b88_b0cf_d8a0986be2e0_4);
+        function pop_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osm_id'] !== null ? autolinker.link(String(feature.properties['osm_id']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['code'] !== null ? autolinker.link(String(feature.properties['code']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fclass'] !== null ? autolinker.link(String(feature.properties['fclass']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['width'] !== null ? autolinker.link(String(feature.properties['width']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5_0() {
+            return {
+                pane: 'pane_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5',
+                opacity: 1,
+                color: 'rgba(234,234,234,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 2.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5');
+        map.getPane('pane_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5').style.zIndex = 405;
+        map.getPane('pane_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5').style['mix-blend-mode'] = 'normal';
+        var layer_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5 = new L.geoJson(json_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5',
+            layerName: 'layer_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5',
+            pane: 'pane_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5',
+            onEachFeature: pop_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5,
+            style: style_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5_0,
+        });
+        bounds_group.addLayer(layer_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5);
+        map.addLayer(layer_gis_osm_waterways_free_1_7b7a34dc_1d67_444c_a3f1_84eb87953e59_5);
+        function pop_output_point_layercopy_6(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        map.createPane('pane_output_point_layercopy_6');
+        map.getPane('pane_output_point_layercopy_6').style.zIndex = 406;
+        map.getPane('pane_output_point_layercopy_6').style['mix-blend-mode'] = 'multiply';
+        var output_point_layercopy_6_hm = geoJson2heat(json_output_point_layercopy_6,
+                                      '');
+        var layer_output_point_layercopy_6 = new L.heatLayer(output_point_layercopy_6_hm, {
+            attribution: '',
+            interactive: true,
+            radius: 16,
+            max: 1,
+            minOpacity: 1,
+            gradient: {0: '#ffffff', 0.13: '#feebe2', 0.26: '#fcbba1', 0.39: '#fc9272', 0.52: '#fb6a4a', 0.65: '#ef3b2c', 0.78: '#cb181d', 0.9: '#a50f15', 1: '#67000d'}});
+        bounds_group.addLayer(layer_output_point_layercopy_6);
+        map.addLayer(layer_output_point_layercopy_6);
+        function pop_output_point_layer_7(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(String(feature.properties['fid']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['name'] !== null ? autolinker.link(String(feature.properties['name']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_output_point_layer_7_0() {
+            return {
+                pane: 'pane_output_point_layer_7',
+                radius: 3.0,
+                stroke: false,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(255,255,255,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_output_point_layer_7');
+        map.getPane('pane_output_point_layer_7').style.zIndex = 407;
+        map.getPane('pane_output_point_layer_7').style['mix-blend-mode'] = 'normal';
+        var layer_output_point_layer_7 = new L.geoJson(json_output_point_layer_7, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_output_point_layer_7',
+            layerName: 'layer_output_point_layer_7',
+            pane: 'pane_output_point_layer_7',
+            onEachFeature: pop_output_point_layer_7,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_output_point_layer_7_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_output_point_layer_7);
+        map.addLayer(layer_output_point_layer_7);
+        setBounds();
+        function geoJson2heat(geojson, weight) {
+          return geojson.features.map(function(feature) {
+            return [
+              feature.geometry.coordinates[1],
+              feature.geometry.coordinates[0],
+              feature.properties[weight]
+            ];
+          });
+        }
+        </script>        
+    </body>
+</html>
